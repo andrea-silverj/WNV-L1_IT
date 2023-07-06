@@ -1,0 +1,404 @@
+---
+title: "WNV L1 phylogeny in Italy and the Mediterranean Basin - Revision1"
+author: "Andrea Silverj"
+date: '2023-07-03'
+output: html_document
+---
+
+# -----[Data analysis and visualization]-----
+
+Set working directory and load libraries:
+```{r message=FALSE, warning=FALSE}
+setwd("C:/Users/silverja/Projects/wnv_L1/plots")
+library("ggplot2")
+library("tidyverse")
+library("ggtree")
+library("ips")
+library("treeio")
+library("tidytree")
+library("ggimage")
+library("ggnewscale")
+library("phytools")
+library("phangorn")
+library("writexl")
+library("readxl")
+library("extrafont")
+
+```
+
+Figure 1 - Map Showing the obtained samples
+```{r}
+# Load libraries and set themes
+library("sf")
+library("rnaturalearth")
+library("rnaturalearthdata")
+library("mapproj")
+library("raster")
+library("maptools")
+library("stars")
+library("sf")
+library("rgdal")
+library("raster")
+theme_set(theme_bw())
+
+# Load and transform data
+wnv1IZS_data <- read.csv("wnvL1IZS-Rplot.tsv", sep="\t")
+wnv1IZS_data_year <- wnv1IZS_data %>% separate(Collection_Date, into=c("day","month","year"), sep="[/]", remove=FALSE)
+
+# Retrieve world geographic data, transform them in a raster and zoom on the area of interest
+world <- ne_countries(scale = "large", returnclass = "sf")
+world_spatial <- as_Spatial(world)
+italy_raster <- raster(crs = crs(world), vals = 0, resolution = c(0.1, 0.1), ext = extent(c(6.3, 18.7, 36.5, 47.2))) %>% rasterize(world, .)
+
+# Insert borders
+borders = crop(getData("GADM", country="ITA", level=1), extent(italy_raster))
+ita_borders <- st_as_sf(borders)
+
+# Set colour palette
+colfunc <- c('2008'="#117733", '2009'="#AA4499", '2011'="#6699CC", '2012'="#882255", '2020'="#888888", '2022'="#CC6677")
+
+# Plot the whole area (Italy)
+ggplot(data = world) +
+    geom_sf(data = ita_borders, fill = "white", color="black", size=0.3) +
+    geom_point(data = wnv1IZS_data_year, aes(x = longitude, y = latitude, shape=Host_category, color=year), size = 2, fill = "darkred") +
+    coord_sf(xlim = c(6.3, 18.7), ylim = c(36.5, 47.2), expand = FALSE)+
+
+    theme(panel.grid.major = element_line(colour = "transparent"), axis.text.x=element_blank(), axis.ticks.x=element_blank(),
+      axis.text.y=element_blank(),
+      axis.ticks.y=element_blank(), axis.title.x=element_blank(), axis.title.y=element_blank(), panel.border = element_blank(), legend.text=element_text(size=10))+
+labs(color="Year", shape = "Host")+scale_color_manual(values=colfunc, na.value="#000000")
+
+# Zoom on northern Italian area
+ggplot(data = world) +
+    geom_sf(data = ita_borders, fill = "white", color="black", size=0.4) +
+    geom_point(data = wnv1IZS_data_year, aes(x = longitude, y = latitude, shape=Host_category, color=year), size = 4) +
+    coord_sf(xlim = c(10.5, 13.2), ylim = c(44.4, 45.95), expand = FALSE)+
+    theme(panel.grid.major = element_line(colour = "transparent"), axis.text.x=element_blank(), axis.ticks.x=element_blank(),
+      axis.text.y=element_blank(),
+      axis.ticks.y=element_blank(), axis.title.x=element_blank(), axis.title.y=element_blank(), panel.border = element_blank(), legend.text=element_text(size=10))+
+labs(color="Year", shape = "Host")+scale_color_manual(values=colfunc, na.value="#000000")
+
+# Zoom on Sardinia
+ggplot(data = world) +
+    geom_sf(data = ita_borders, fill = "white", color="black", size=0.4) +
+    geom_point(data = wnv1IZS_data_year, aes(x = longitude, y = latitude, shape=Host_category, color=year), size = 4) +
+    coord_sf(xlim = c(7.9, 8.75), ylim = c(39.66, 39.95), expand = FALSE)+
+    theme(panel.grid.major = element_line(colour = "transparent"), axis.text.x=element_blank(), axis.ticks.x=element_blank(),
+      axis.text.y=element_blank(),
+      axis.ticks.y=element_blank(), axis.title.x=element_blank(), axis.title.y=element_blank(), panel.border = element_blank(), legend.text=element_text(size=10))+
+labs(color="Year", shape = "Host")+scale_color_manual(values=colfunc, na.value="#000000")
+```
+
+# Figure 2 - Maximum-likelihood tree with 185 WNV-L1 sequences from all over the world
+```{r}
+# Load and root the tree 
+wnv_ml_tree <- read.tree("RAxML_bipartitions.wnv_L1_world_noreco_trimmed.tre")
+wnv_ml_tree_r <- midpoint.root(wnv_ml_tree)
+
+# Convert data stored in the tree into a dataframe and save all in a file
+# wnv_ml_tree_r_tib <- as_tibble(wnv_ml_tree_r)
+# wnv_ml_tree_r_df <- as.data.frame(wnv_ml_tree_r_tib)
+# wnv_ml_tree_r_df_annp1 <- wnv_ml_tree_r_df %>% separate(label, into=c("id","place","date"), sep="[|]", remove=FALSE)
+# wnv_ml_tree_r_df_ann <- wnv_ml_tree_r_df_annp1 %>% mutate(bootstrap_support=ifelse(label > 50 & label < 70, "medium", ifelse(label >= 100, "high","low")))
+# write_xlsx(wnv_ml_tree_r_df_ann,"wnv_ml_tree_r_df_ann.xlsx")
+
+# Load saved data and remove NAs
+wnv_ml_tree_r_df_ann <- read_excel("wnv_ml_tree_r_df_ann.xlsx")
+wnv_ml_tree_r_df_ann <- data.frame(wnv_ml_tree_r_df_ann)
+wnv_ml_tree_r_df_ann[is.na(wnv_ml_tree_r_df_ann)] <- ""
+
+# Set colours
+colour_region=c(France="#0072B2",
+                Italy="#009E73",
+                Morocco="#D55E00",
+                Portugal="#E69F00",
+                Spain="#CC79A7", 
+                medium="yellow", 
+                low="red", 
+                high="transparent")
+
+# Get node numbers for annotating clades
+# ggtree(wnv_ml_tree_r)+
+#  geom_text(aes(label=node), size=2)+
+#  geom_tiplab(size=1.5)
+
+# Annotate clades
+highlight_wnvl1_ml <- data.frame(node=c(192), type=c("Clade"))
+highlight_cluster1 <- data.frame(node=c(192), type=c("Clade"))
+highlight_cluster2 <- data.frame(node=c(192), type=c("Clade"))
+highlight_cluster3 <- data.frame(node=c(192), type=c("Clade"))
+highlight_cluster4 <- data.frame(node=c(192), type=c("Clade"))
+highlight_cluster5 <- data.frame(node=c(192), type=c("Clade"))
+highlight_cluster6 <- data.frame(node=c(271), type=c("Clade"))
+highlight_cluster7 <- data.frame(node=c(192), type=c("Clade"))
+
+# Plot and save the tree
+wnv_ml_tree_r_gg <- ggtree(wnv_ml_tree_r)+
+  geom_tiplab(size=2.5, aes(label=paste0(wnv_ml_tree_r_df_ann$label, wnv_ml_tree_r_df_ann$izs)), parse=F)+
+  geom_nodepoint(aes(color=wnv_ml_tree_r_df_ann$bootstrap_support))+
+  aes(color=wnv_ml_tree_r_df_ann$place)+
+  scale_color_manual(values=colour_region, na.value="#000000")+
+  labs(color="Country:")+
+  theme(legend.position="left")+ 
+  xlim(0, 0.1)+
+  geom_hilight(data=highlight_wnvl1_ml, aes(node=node),type = "roundrect", alpha=0, colour="#373332", extend=0.022)+
+  geom_cladelab(node=201, label="Clade 1", colour="black", horizontal=TRUE, barsize=1, angle=90, hjust=0.5, offset=0.02, offset.text=0.001)+
+  geom_cladelab(node=230, label="Clade 2", colour="black", horizontal=TRUE, barsize=1, angle=90, hjust=0.5, offset=0.02, offset.text=0.001)+
+  geom_cladelab(node=251, label="Clade 3", colour="black", horizontal=TRUE, barsize=1, angle=90, hjust=0.5, offset=0.02, offset.text=0.001)+
+  geom_cladelab(node=256, label="Clade 4", colour="black", horizontal=TRUE, barsize=1, angle=90, hjust=0.5, offset=0.02, offset.text=0.001)+
+  geom_cladelab(node=361, label="C1", colour="black", horizontal=TRUE, barsize=3, angle=90, hjust=0.5, offset=0.0225, offset.text=0.0)+
+  geom_cladelab(node=190, label="C2", colour="black", horizontal=TRUE, barsize=3, angle=90, hjust=0.5, offset=0.0225, offset.text=0.0)+
+  geom_cladelab(node=273, label="C3", colour="black", horizontal=TRUE, barsize=3, angle=90, hjust=0.5, offset=0.0225, offset.text=0.0)+
+  geom_cladelab(node=278, label="C4", colour="black", horizontal=TRUE, barsize=3, angle=90, hjust=0.5, offset=0.0225, offset.text=0.0)+
+  geom_cladelab(node=360, label="C5", colour="black", horizontal=TRUE, barsize=3, angle=90, hjust=0.5, offset=0.0225, offset.text=0.0)+
+  geom_cladelab(node=271, label="C6", colour="black", horizontal=TRUE, barsize=3, angle=90, hjust=0.5, offset=0.0225, offset.text=0.0)
+  geom_cladelab(node=38, label="C7", colour="black", horizontal=TRUE, barsize=3, angle=90, hjust=0.5, offset=0.0225, offset.text=0.0)+theme(text=element_text(family="Arial"))
+
+wnv_ml_tree_r_gg_amc <- wnv_ml_tree_r_gg %>% collapse(node=280)+geom_point2(aes(subset=(node==280)), shape=22, size=2, color='violet')+geom_treescale(fontsize=6, linesize=2, offset=1)#+geom_tiplab(aes(label=paste0(wnv_ml_tree_r_df_ann$label, wnv_ml_tree_r_df_ann$izs)), parse=F)
+
+ggsave("Figure2scale.pdf", width = 28, height = 28, units = "cm", limitsize = FALSE)
+```
+
+# Figure 3A - Bayesian molecular clock of a subset of the dataset
+```{r}
+# Load tree file and save information as a data frame
+wnvtree_bay <- read.beast("wnv_L1_mediterranean_clock_trimmedRevision1.tre")
+wnvtree_bay_tib <- as_tibble(wnvtree_bay)
+wnvtree_bay_df <- as.data.frame(wnvtree_bay_tib)
+
+# Extract infos from header
+wnvtree_bay_df_annp1 <- wnvtree_bay_df %>% separate(label, into=c("id","place","date"), sep="[|]", remove=FALSE)
+
+# Add node shapes and colours based on posterior supports
+wnvtree_bay_df_annp2 <- wnvtree_bay_df_annp1 %>% mutate(posteriorsupport=ifelse(posterior > 0.5 & posterior < 0.9, "medium", ifelse(posterior >= 0.9, "high","low")))
+
+wnvtree_bay_df_ann <- wnvtree_bay_df_annp2 %>% mutate(height_median_yr=2022.75-height_median)
+
+wnvtree_bay_df_ann$height_median_yr[is.na(wnvtree_bay_df_ann$height_median_yr)] <- 2022.75
+
+# Set colours
+colour_region=c(medium="yellow", low="red", high="transparent")
+colour_scale = c(colorRampPalette(rev(brewer.pal(11,"RdYlBu")))(141)[21:121])
+
+# Plot the tree
+wnv_tree_plot <- ggtree(wnvtree_bay, size=1.1,  mrsd="2022-10-03")+
+  #aes(color=wnvtree_bay_df_ann$place)+
+  theme_tree2(axis.line.x = element_line(size=1.1), 
+  axis.ticks.x = element_line(size=1.1), axis.text.x = element_text(size=13))+
+  theme(legend.position="top", legend.text = element_text(size = 11),legend.title = element_text(size = 12))+
+  ggtitle("WNV-L1 IT timetree")+
+  geom_range(range='height_0.95_HPD', color='#1820E4', alpha=.5, size=1.2, linetype=1)+
+  geom_nodepoint(aes(color=as.numeric(wnvtree_bay_df_ann$height_median_yr), shape=wnvtree_bay_df_ann$posteriorsupport), size=3.8)+
+  geom_tippoint(aes(color=as.numeric(wnvtree_bay_df_ann$height_median_yr)), size=2.5)+
+  scale_x_continuous(breaks = c(1980,1985,1990,1995,2000,2005,2010,2015,2020))+
+  geom_tiplab(size=3.2, offset=0.5)+
+  labs(color="Age:")+
+  scale_color_gradientn(colors=colour_scale)+scale_shape_manual(values=c("low"=3, "medium"=17, "high"=15))
+
+#, na.value="#000000"
+# Load host information data and use them to annotate the tree
+id_host_tab <- read.table(file="annotation_wnv1Rev.txt", sep="\t", stringsAsFactor=F)
+annotated_tree_host <- gheatmap(wnv_tree_plot, id_host_tab, offset=18.5, width=.05, colnames=TRUE)+scale_fill_manual(breaks=c("Human","Bird","Mosquito","Horse"), values=c("#882255","#DDCC77","darkgrey","darkgreen"), name="Host")
+
+ggsave("revision1/Figure3.1.pdf", width = 15, height = 10, units = "in", limitsize = FALSE)
+```
+
+Figure 3B - Phylogeographic analysis of a subset of the dataset using Seraphim
+```{r}
+library(seraphim)
+library(diagram)
+
+# Step 1: extracting spatio-temporal information embedded in posterior trees
+localTreesDirectory = "Extracted_trees_Revision1"
+allTrees = scan(file="wnv_L1_mediterranean_clock_trimmedRevision1.trees", what="", sep="\n", quiet=TRUE)
+burnIn = 0
+randomSampling = FALSE
+nberOfTreesToSample = 1000
+mostRecentSamplingDatum = 2022.75
+coordinateAttributeName = "location"
+treeExtractions(localTreesDirectory, allTrees, burnIn, randomSampling,
+nberOfTreesToSample, mostRecentSamplingDatum, coordinateAttributeName)
+
+# Step 2: extracting spatio-temporal information embedded in the MCC tree
+mcc_tre = readAnnotatedNexus("wnv_L1_mediterranean_clock_trimmedRevision1.tre")
+source("mccExtractions.r")
+mcc_tab = mccExtractions(mcc_tre, mostRecentSamplingDatum)
+
+# Step 3: estimating the HPD region for each time slice
+nberOfExtractionFiles = nberOfTreesToSample
+prob = 0.95
+precision = 0.025
+startDatum = min(mcc_tab[,"startYear"])
+polygons = suppressWarnings(spreadGraphic2(localTreesDirectory,
+nberOfExtractionFiles, prob, startDatum, precision))
+
+# Step 4: defining the different colour scales to use
+colour_scale = colorRampPalette(rev(brewer.pal(11,"RdYlBu")))(141)[21:121]
+minYear = min(mcc_tab[,"startYear"]); maxYear = max(mcc_tab[,"endYear"])
+endYears_indices = (((mcc_tab[,"endYear"]-minYear)/(maxYear-minYear))*100)+1
+endYears_colours = colour_scale[endYears_indices]
+polygons_colours = rep(NA, length(polygons))
+for (i in 1:length(polygons)) {
+date = as.numeric(names(polygons[[i]]))
+polygon_index = round((((date-minYear)/(maxYear-minYear))*100)+1)
+polygons_colours[i] = paste0(colour_scale[polygon_index],"40")
+}
+
+# Step 5: co-plotting the HPD regions and MCC tree
+library("ggplot2")
+theme_set(theme_bw())
+library("sf")
+library("raster")
+library("rnaturalearthdata")
+library("rnaturalearth")
+library("geodata")
+
+world <- ne_countries(scale = "large", returnclass = "sf")
+class(world)
+
+world_spatial <- as_Spatial(world)
+world_raster <- raster(crs = crs(world), vals = 0, resolution = c(0.05, 0.05), ext = extent(c(-15, 37, 30, 49))) %>% rasterize(world, .)
+
+plot(world_raster, col="white", box=F, axes=F, colNA="grey90", legend=F)
+
+set_border_level=0
+
+# Download border data
+bordersITA = crop(getData("GADM", country=c("ITA"), level=1), extent(world_raster))
+bordersFRA = crop(getData("GADM", country="FRA", level=set_border_level), extent(world_raster))
+bordersESP = crop(getData("GADM", country="ESP", level=set_border_level), extent(world_raster))
+bordersMAR = crop(getData("GADM", country="MAR", level=set_border_level), extent(world_raster))
+bordersPRT = crop(getData("GADM", country="PRT", level=set_border_level), extent(world_raster))
+bordersCHE = crop(getData("GADM", country="CHE", level=set_border_level), extent(world_raster))
+bordersAUT = crop(getData("GADM", country="AUT", level=set_border_level), extent(world_raster))
+bordersHRV = crop(getData("GADM", country="HRV", level=set_border_level), extent(world_raster))
+bordersSVN = crop(getData("GADM", country="SVN", level=set_border_level), extent(world_raster))
+bordersBIH = crop(getData("GADM", country="BIH", level=set_border_level), extent(world_raster))
+bordersMNE = crop(getData("GADM", country="MNE", level=set_border_level), extent(world_raster))
+bordersALB = crop(getData("GADM", country="ALB", level=set_border_level), extent(world_raster))
+bordersGRC = crop(getData("GADM", country="GRC", level=set_border_level), extent(world_raster))
+bordersSRB = crop(getData("GADM", country="SRB", level=set_border_level), extent(world_raster))
+bordersMKD = crop(getData("GADM", country="MKD", level=set_border_level), extent(world_raster))
+bordersHUN = crop(getData("GADM", country="HUN", level=set_border_level), extent(world_raster))
+bordersROU = crop(getData("GADM", country="ROU", level=set_border_level), extent(world_raster))
+bordersBGR = crop(getData("GADM", country="BGR", level=set_border_level), extent(world_raster))
+bordersDZA = crop(getData("GADM", country="DZA", level=set_border_level), extent(world_raster))
+bordersTUN = crop(getData("GADM", country="TUN", level=set_border_level), extent(world_raster))
+bordersLBY = crop(getData("GADM", country="LBY", level=set_border_level), extent(world_raster))
+bordersEGY = crop(getData("GADM", country="EGY", level=set_border_level), extent(world_raster))
+bordersISR = crop(getData("GADM", country="ISR", level=set_border_level), extent(world_raster))
+bordersLBN = crop(getData("GADM", country="LBN", level=set_border_level), extent(world_raster))
+bordersDEU = crop(getData("GADM", country="DEU", level=set_border_level), extent(world_raster))
+bordersSVK = crop(getData("GADM", country="SVK", level=set_border_level), extent(world_raster))
+bordersCZE = crop(getData("GADM", country="CZE", level=set_border_level), extent(world_raster))
+bordersUKR = crop(getData("GADM", country="UKR", level=set_border_level), extent(world_raster))
+bordersMDA = crop(getData("GADM", country="MDA", level=set_border_level), extent(world_raster))
+bordersTUR = crop(getData("GADM", country="TUR", level=set_border_level), extent(world_raster))
+bordersMLT = crop(getData("GADM", country="MLT", level=set_border_level), extent(world_raster))
+bordersCYP = crop(getData("GADM", country="CYP", level=set_border_level), extent(world_raster))
+bordersSYR = crop(getData("GADM", country="SYR", level=set_border_level), extent(world_raster))
+bordersSMR = crop(getData("GADM", country="SMR", level=set_border_level), extent(world_raster))
+bordersVAT = crop(getData("GADM", country="VAT", level=set_border_level), extent(world_raster))
+bordersLIE = crop(getData("GADM", country="LIE", level=set_border_level), extent(world_raster))
+bordersMCO = crop(getData("GADM", country="MCO", level=set_border_level), extent(world_raster))
+bordersXNC = crop(getData("GADM", country="XNC", level=set_border_level), extent(world_raster))
+bordersAND = crop(getData("GADM", country="AND", level=set_border_level), extent(world_raster))
+bordersRUS = crop(getData("GADM", country="RUS", level=set_border_level), extent(world_raster))
+bordersJOR = crop(getData("GADM", country="JOR", level=set_border_level), extent(world_raster))
+
+# Set plot sizes
+lwd_size=0.55
+lwd_size=0.40
+dev.new(width=6, height=6.3)
+par(mar=c(0,0,0,0), oma=c(1.2,3.5,1,0), mgp=c(0,0.4,0), lwd=0.2, bty="o")
+
+# Plot
+plot(world_raster, col="transparent", box=F, axes=F, colNA="transparent", legend=F)
+
+
+for (i in 1:length(polygons)) {
+plot(polygons[[i]], axes=F, col=polygons_colours[i], add=T, border=NA)
+}
+
+plot(bordersITA, add=T, lwd=lwd_size, border="gray10")
+plot(bordersFRA, add=T, lwd=lwd_size, border="gray10")
+plot(bordersESP, add=T, lwd=lwd_size, border="gray10")
+plot(bordersMAR, add=T, lwd=lwd_size, border="gray10")
+plot(bordersPRT, add=T, lwd=lwd_size, border="gray10")
+plot(bordersCHE, add=T, lwd=lwd_size, border="gray10")
+plot(bordersAUT, add=T, lwd=lwd_size, border="gray10")
+plot(bordersHRV, add=T, lwd=lwd_size, border="gray10")
+plot(bordersSVN, add=T, lwd=lwd_size, border="gray10")
+plot(bordersBIH, add=T, lwd=lwd_size, border="gray10")
+plot(bordersMNE, add=T, lwd=lwd_size, border="gray10")
+plot(bordersALB, add=T, lwd=lwd_size, border="gray10")
+plot(bordersGRC, add=T, lwd=lwd_size, border="gray10")
+plot(bordersSRB, add=T, lwd=lwd_size, border="gray10")
+plot(bordersMKD, add=T, lwd=lwd_size, border="gray10")
+plot(bordersHUN, add=T, lwd=lwd_size, border="gray10")
+plot(bordersROU, add=T, lwd=lwd_size, border="gray10")
+plot(bordersBGR, add=T, lwd=lwd_size, border="gray10")
+plot(bordersDZA, add=T, lwd=lwd_size, border="gray10")
+plot(bordersTUN, add=T, lwd=lwd_size, border="gray10")
+plot(bordersLBY, add=T, lwd=lwd_size, border="gray10")
+plot(bordersEGY, add=T, lwd=lwd_size, border="gray10")
+plot(bordersISR, add=T, lwd=lwd_size, border="gray10")
+plot(bordersLBN, add=T, lwd=lwd_size, border="gray10")
+plot(bordersDEU, add=T, lwd=lwd_size, border="gray10")
+plot(bordersSVK, add=T, lwd=lwd_size, border="gray10")
+plot(bordersCZE, add=T, lwd=lwd_size, border="gray10")
+plot(bordersUKR, add=T, lwd=lwd_size, border="gray10")
+plot(bordersMDA, add=T, lwd=lwd_size, border="gray10")
+plot(bordersTUR, add=T, lwd=lwd_size, border="gray10")
+plot(bordersMLT, add=T, lwd=lwd_size, border="gray10")
+plot(bordersCYP, add=T, lwd=lwd_size, border="gray10")
+plot(bordersSYR, add=T, lwd=lwd_size, border="gray10")
+plot(bordersSMR, add=T, lwd=lwd_size, border="gray10")
+plot(bordersVAT, add=T, lwd=lwd_size, border="gray10")
+plot(bordersLIE, add=T, lwd=lwd_size, border="gray10")
+plot(bordersXNC, add=T, lwd=lwd_size, border="gray10")
+plot(bordersAND, add=T, lwd=lwd_size, border="gray10")
+plot(bordersRUS, add=T, lwd=lwd_size, border="gray10")
+plot(bordersJOR, add=T, lwd=lwd_size, border="gray10")
+
+for (i in 1:dim(mcc_tab)[1]) {
+4
+curvedarrow(cbind(mcc_tab[i,"startLon"],mcc_tab[i,"startLat"]),
+cbind(mcc_tab[i,"endLon"],mcc_tab[i,"endLat"]), arr.length=0,
+arr.width=0, lwd=0.4, lty=1, lcol="gray10", arr.col=NA,
+arr.pos=F, curve=0.1, dr=NA, endhead=F)
+}
+for (i in dim(mcc_tab)[1]:1) {
+if (i == 1) {
+points(mcc_tab[i,"startLon"], mcc_tab[i,"startLat"], pch=16,
+col=colour_scale[1], cex=0.5)
+points(mcc_tab[i,"startLon"], mcc_tab[i,"startLat"], pch=1,
+col="gray10", cex=0.5)
+}
+points(mcc_tab[i,"endLon"], mcc_tab[i,"endLat"], pch=16,
+col=endYears_colours[i], cex=0.5)
+points(mcc_tab[i,"endLon"], mcc_tab[i,"endLat"], pch=1,
+col="gray10", cex=0.5)
+}
+
+#rect(xmin(world_raster), ymin(world_raster), xmax(world_raster),
+#ymax(world_raster), xpd=T, lwd=0.2)
+#axis(1, c(ceiling(xmin(world_raster)), floor(xmax(world_raster))),
+#pos=ymin(world_raster), mgp=c(0,0.2,0), cex.axis=0.5, lwd=0, lwd.tick=0.2,
+#padj=-0.8, tck=-0.01, col.axis="gray30")
+#axis(2, c(ceiling(ymin(world_raster)), floor(ymax(world_raster))),
+#pos=xmin(world_raster), mgp=c(0,0.5,0), cex.axis=0.5, lwd=0, lwd.tick=0.2,
+#padj=1, tck=-0.01, col.axis="gray30")
+#rast = raster(matrix(nrow=1, ncol=2))
+#rast[1] = min(mcc_tab[,"startYear"])
+#rast[2] = max(mcc_tab[,"endYear"])
+
+plot(rast, legend.only=T, add=T, col=colour_scale, legend.width=0.5,
+legend.shrink=0.3, smallplot=c(0.40,0.80,0.14,0.155), legend.args=list(text="",
+cex=0.7, line=0.3, col="gray30"), horizontal=T, axis.args=list(cex.axis=0.6,
+lwd=0, lwd.tick=0.2, tck=-0.5, col.axis="gray30", line=0, mgp=c(0,-0.02,0),
+at=seq(1980, 2023, 1)))
+
+# colour_scale[55:99]
+
+```
